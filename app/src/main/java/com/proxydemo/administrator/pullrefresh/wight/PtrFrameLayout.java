@@ -3,6 +3,7 @@ package com.proxydemo.administrator.pullrefresh.wight;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -18,6 +19,9 @@ public class PtrFrameLayout extends ViewGroup {
     protected View mContent;
     private int mContainerId = 0;
     private int mHeaderHeight;
+    private float mLastX;
+    private float mLastY;
+    private MotionEvent mLastMoveEvent;
 
     public PtrFrameLayout(Context context) {
         this(context,null);
@@ -50,12 +54,28 @@ public class PtrFrameLayout extends ViewGroup {
     }
 
     @Override
-    protected void onLayout(boolean b, int i, int i1, int i2, int i3) {
+    protected void onLayout(boolean flag, int i, int j, int k, int l) {
         layoutChildren();
     }
 
     private void layoutChildren() {
-
+        int paddingLeft = getPaddingLeft();
+        int paddingTop = getPaddingTop();
+        if (mHeaderView != null) {
+            LayoutParams layoutParams = mHeaderView.getLayoutParams();
+            int left = paddingLeft;
+            int top = -(mHeaderHeight - paddingTop);
+            int right = left + mHeaderView.getMeasuredWidth();
+            int bottom = top + mHeaderView.getMeasuredHeight();
+            mHeaderView.layout(left, top, right, bottom);
+        }
+        if (mContent != null) {
+             int contentLeft = paddingLeft;
+             int contentTop = paddingTop;
+             int contentRight = contentLeft+mContent.getMeasuredWidth();
+             int contentBottom = contentTop+mContent.getMeasuredHeight();
+            mContent.layout(contentLeft,contentTop,contentRight,contentBottom);
+        }
     }
 
     @Override
@@ -108,6 +128,33 @@ public class PtrFrameLayout extends ViewGroup {
             mHeaderView.bringToFront();
         }
         super.onFinishInflate();
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (mHeaderView == null || mContent == null) {
+            return false;
+        }
+        switch (ev.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                mLastX = ev.getX();
+                mLastY = ev.getY();
+                break;
+            case MotionEvent.ACTION_MOVE:
+                mLastMoveEvent = ev;
+                float offsetX = ev.getX() - mLastX;
+                float offsetY = ev.getY() - mLastY;
+                mLastX = ev.getX();
+                mLastY = ev.getY();
+                mHeaderView.offsetTopAndBottom((int) offsetY);
+                mContent.offsetTopAndBottom((int) offsetY);
+                break;
+            case MotionEvent.ACTION_UP:
+                break;
+            case MotionEvent.ACTION_CANCEL:
+                break;
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     public void setHeaderView(View view) {
