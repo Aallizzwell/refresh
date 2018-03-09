@@ -28,11 +28,13 @@ public class PtrFrameLayout extends ViewGroup {
     private float mResistance = 1.7f;
     private float mOffsetX;
     private float mOffsetY;
-    private float mCurrentPos = 0;
+    private int mCurrentPos = 0;
     private float mLastFlingY = 0;
     private Scroller mScroller;
     private boolean mIsMove = false;
-
+    private boolean isMoveUp = false;
+    private boolean isMoveDown = false;
+    private boolean mIsLoading = false;
 
     public PtrFrameLayout(Context context) {
         this(context, null);
@@ -150,20 +152,38 @@ public class PtrFrameLayout extends ViewGroup {
             case MotionEvent.ACTION_DOWN:
                 mLastX = ev.getX();
                 mLastY = ev.getY();
+                if (mScroller != null && !mScroller.isFinished()) {
+                    mScroller.forceFinished(true);
+                }
+                Log.i(TAG, "ACTION_DOWN");
                 break;
             case MotionEvent.ACTION_MOVE:
                 mLastMoveEvent = ev;
                 mIsMove = true;
-                Log.i(TAG, "ACTION_MOVE" + "    ev.getX()=" + ev.getY() + "mLastY=" + mLastY);
+//                Log.i(TAG, "ACTION_MOVE" + "    ev.getX()=" + ev.getY() + "mLastY=" + mLastY);
                 mOffsetX = ev.getX() - mLastX;
                 mOffsetY = ev.getY() - mLastY;
+                if (mOffsetY > 0) {
+                    isMoveDown = true;
+                } else {
+                    isMoveDown = false;
+                }
+                isMoveUp = !isMoveDown;
+                if (mIsLoading) {
+                    return super.dispatchTouchEvent(ev);
+                }
+                //初始化状态不可以向上滑动
+                if (isMoveUp && mCurrentPos == 0) {
+                    return super.dispatchTouchEvent(ev);
+                }
                 mOffsetY = mOffsetY / mResistance;
 
 //                Log.i(TAG, "ACTION_MOVE" + " ------------------------------------------------");
                 mLastX = ev.getX();
                 mLastY = ev.getY();
-                mCurrentPos = mCurrentPos + mOffsetY;
-//                Log.i(TAG, "ACTION_MOVE" + "    mCurrentPos=" + mCurrentPos + "mOffsetY=" + mOffsetY);
+                mCurrentPos = mCurrentPos + (int) mOffsetY;
+
+                Log.i(TAG, "ACTION_MOVE" + "    mCurrentPos=" + mCurrentPos + "mOffsetY=" + mOffsetY + "   IntOffsetY=" + (int) mOffsetY);
                 mHeaderView.offsetTopAndBottom((int) mOffsetY);
                 mContent.offsetTopAndBottom((int) mOffsetY);
                 break;
@@ -172,9 +192,11 @@ public class PtrFrameLayout extends ViewGroup {
                 mIsMove = false;
                 Log.i(TAG, "ACTION_CANCEL" + "    mCurrentPos=" + mCurrentPos);
                 if (mCurrentPos - mHeaderHeight > 0) {
-                    mCurrentPos = mCurrentPos - mHeaderHeight;
+                    int back = mCurrentPos - mHeaderHeight;
+                    Log.i(TAG, "ACTION_CANCEL" + "    back=" + back);
+                    mScroller.startScroll(0, 0, 0, back, 200);
+                    mIsLoading = true;
                 }
-                mScroller.startScroll(0, 0, 0, (int) mCurrentPos, 200);
                 invalidate();
                 break;
             default:
@@ -195,15 +217,11 @@ public class PtrFrameLayout extends ViewGroup {
             mContent.offsetTopAndBottom(-(int) deltaY);
             invalidate();
         } else {
-//            if (!mIsMove) {
-//                mLastFlingY = 0;
-//                mCurrentPos = 0;
-//                Log.i(TAG, "computeScroll Finish" + "    mCurrentPos=" + mCurrentPos);
-//            }
-            mLastFlingY = 0;
-            mCurrentPos = 0;
-            Log.i(TAG, "computeScroll Finish" + "    mCurrentPos=" + mCurrentPos);
-
+            if (!mIsMove) {
+                mLastFlingY = 0;
+                mCurrentPos = 0;
+                Log.i(TAG, "computeScroll Finish" + "    mCurrentPos=" + mCurrentPos);
+            }
         }
     }
 
@@ -225,6 +243,7 @@ public class PtrFrameLayout extends ViewGroup {
         post(new Runnable() {
             @Override
             public void run() {
+                mIsLoading = false;
                 mScroller.startScroll(0, 0, 0, (int) mHeaderHeight, 100);
                 invalidate();
             }
