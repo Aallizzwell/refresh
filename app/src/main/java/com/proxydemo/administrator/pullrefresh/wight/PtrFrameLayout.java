@@ -35,6 +35,7 @@ public class PtrFrameLayout extends ViewGroup {
     private boolean isMoveUp = false;
     private boolean isMoveDown = false;
     private boolean mIsLoading = false;
+    private int mLastPos;
 
     public PtrFrameLayout(Context context) {
         this(context, null);
@@ -150,6 +151,7 @@ public class PtrFrameLayout extends ViewGroup {
         }
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
+//              //初始位置
                 mLastX = ev.getX();
                 mLastY = ev.getY();
                 if (mScroller != null && !mScroller.isFinished()) {
@@ -160,32 +162,35 @@ public class PtrFrameLayout extends ViewGroup {
             case MotionEvent.ACTION_MOVE:
                 mLastMoveEvent = ev;
                 mIsMove = true;
-//                Log.i(TAG, "ACTION_MOVE" + "    ev.getX()=" + ev.getY() + "mLastY=" + mLastY);
+                //1.计算出滑动后的偏移量
                 mOffsetX = ev.getX() - mLastX;
                 mOffsetY = ev.getY() - mLastY;
+                mLastX = ev.getX();
+                mLastY = ev.getY();
+                //2.实际应当滑动距离
+                mOffsetY = mOffsetY / mResistance;
+                //3.滑动方向
                 if (mOffsetY > 0) {
                     isMoveDown = true;
                 } else {
                     isMoveDown = false;
                 }
                 isMoveUp = !isMoveDown;
-                if (mIsLoading) {
-                    return super.dispatchTouchEvent(ev);
+//                if (mIsLoading) {
+//                    return super.dispatchTouchEvent(ev);
+//                }
+                if ((isMoveUp && mCurrentPos > 0) || isMoveDown) {
+                    //5.contentView距离头边的实际距离
+                    mCurrentPos = mCurrentPos + (int) mOffsetY;
+                    if (isMoveUp && mCurrentPos < 0) {
+                        mCurrentPos = 0;
+                        mOffsetY = mCurrentPos - mLastPos;
+                    }
+                    mLastPos = mCurrentPos;
+                    //6.contentView和headerView 实际滑动距离
+                    mHeaderView.offsetTopAndBottom((int) mOffsetY);
+                    mContent.offsetTopAndBottom((int) mOffsetY);
                 }
-                //初始化状态不可以向上滑动
-                if (isMoveUp && mCurrentPos == 0) {
-                    return super.dispatchTouchEvent(ev);
-                }
-                mOffsetY = mOffsetY / mResistance;
-
-//                Log.i(TAG, "ACTION_MOVE" + " ------------------------------------------------");
-                mLastX = ev.getX();
-                mLastY = ev.getY();
-                mCurrentPos = mCurrentPos + (int) mOffsetY;
-
-                Log.i(TAG, "ACTION_MOVE" + "    mCurrentPos=" + mCurrentPos + "mOffsetY=" + mOffsetY + "   IntOffsetY=" + (int) mOffsetY);
-                mHeaderView.offsetTopAndBottom((int) mOffsetY);
-                mContent.offsetTopAndBottom((int) mOffsetY);
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
@@ -213,13 +218,13 @@ public class PtrFrameLayout extends ViewGroup {
         Log.i(TAG, "currY=" + currY + "      deltaY=: " + deltaY);
         if (!finish) {
             mLastFlingY = currY;
+            mCurrentPos = (int) (mCurrentPos - deltaY);
             mHeaderView.offsetTopAndBottom(-(int) deltaY);
             mContent.offsetTopAndBottom(-(int) deltaY);
             invalidate();
         } else {
             if (!mIsMove) {
                 mLastFlingY = 0;
-                mCurrentPos = 0;
                 Log.i(TAG, "computeScroll Finish" + "    mCurrentPos=" + mCurrentPos);
             }
         }
